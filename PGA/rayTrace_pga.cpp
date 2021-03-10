@@ -89,7 +89,7 @@ int main(int argc, char** argv){
       bool hit = raySphereIntersect(eye,rayLine,spherePos,sphereRadius);
       Color color;
       if (hit) color = Color(1,1,1);
-      else color = Color(0,0,0);
+      else color = background;
       outputImg.setPixel(i,j, color);
       //outputImg.setPixel(i,j, Color(fabs(i/imgW),fabs(j/imgH),fabs(0))); //TODO: Try this, what is it visualizing?
     }
