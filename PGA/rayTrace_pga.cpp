@@ -92,7 +92,7 @@ int main(int argc, char** argv){
       Dir3D rayDir = (p - eye); 
       Line3D rayLine = vee(eye,rayDir).normalized();  //Normalizing here is optional
 
-      //Calculate closest intersection
+      // Calculate closest intersection
       float closeD = INF; // Distance to nearest sphere
       int closeIndex = -1; // Index of nearest sphere
       for(int x = 0; x < spheres.size(); x++) {
@@ -102,41 +102,48 @@ int main(int argc, char** argv){
           closeIndex = x;
         }
       }
-      Point3D closePoint = eye + (closeD - 0.01) * rayLine.dir();
-      Dir3D normal = closePoint - spheres[closeIndex].pos;
-      Material material = materials[spheres[closeIndex].matIndex];
-      Color mAmbient = material.ambient;
-      Color mDiffuse = material.diffuse;
-      Color mSpecular = material.specular;
-      Color mTransmissive = material.transmissive;
 
-      Color color = Color(mAmbient.r * ambient.r, mAmbient.g * ambient.g, mAmbient.b * ambient.b);
-      //Check lighting
-      Dir3D lightDir;
-      for(int lightI = 0; lightI < directionalLights.size(); lightI++) {
-        Light currentLight = directionalLights[lightI];
-        bool blocked = false;
-        for(int sphereI = 0; sphereI < spheres.size(); sphereI ++) {
-          Sphere currentSphere = spheres[sphereI];
-          lightDir = (currentLight.pos - closePoint); // Change to inverse direction
-          rayLine = vee(closePoint, lightDir).normalized();
-          if (raySphereIntersect(closePoint, rayLine, currentSphere.pos, currentSphere.r) < INF) {
-            blocked = true;
-            break;
+      Color color;
+      if (closeIndex >= 0) {
+        Point3D closePoint = eye + (closeD - 0.01) * rayLine.dir();
+        Dir3D normal = closePoint - spheres[closeIndex].pos;
+        Material material = materials[spheres[closeIndex].matIndex];
+        Color mAmbient = material.ambient;
+        Color mDiffuse = material.diffuse;
+        Color mSpecular = material.specular;
+        Color mTransmissive = material.transmissive;
+
+        // Set composite color to ambient light to start
+        color = Color(mAmbient.r * ambient.r, mAmbient.g * ambient.g, mAmbient.b * ambient.b);
+
+        // Check directional lights
+        for(int lightI = 0; lightI < directionalLights.size(); lightI++) {
+          DirectionalLight currentLight = directionalLights[lightI];
+          Dir3D lightDir = -1 * currentLight.dir;
+          Line3D lightLine = vee(closePoint, lightDir).normalized();
+          bool blocked = false;
+          for(int sphereI = 0; sphereI < spheres.size(); sphereI ++) {
+            Sphere currentSphere = spheres[sphereI];
+            if (raySphereIntersect(closePoint, lightLine, currentSphere.pos, currentSphere.r) < INF) {
+              blocked = true;
+              break;
+            }
+          }
+
+          // Add light into composite color if it isn't blocked
+          if (!blocked) {
+            float difdot = (0 < dot(lightDir, normal)) ? dot(normal, lightDir) : 0;
+            float r = color.r + (currentLight.color.r * mDiffuse.r * difdot);
+            float g = color.g + (currentLight.color.g * mDiffuse.g * difdot);
+            float b = color.b + (currentLight.color.b * mDiffuse.b * difdot);
+            color = Color(r, g, b);
           }
         }
-        if (!blocked) {
-          float difdot = (0 < dot(lightDir, normal)) ? dot(normal, lightDir) : 0;
-          float r = color.r + (currentLight.color.r * mDiffuse.r * difdot);
-          float g = color.g + (currentLight.color.g * mDiffuse.g * difdot);
-          float b = color.b + (currentLight.color.b * mDiffuse.b * difdot);
-          color = Color(r, g, b);
-        }
+      }
+      else {
+        color = background;
       }
       
-      // Color color;
-      // if (closeIndex >= 0) color = Color(1,1,1);
-      // else color = Color(0,0,0);
       outputImg.setPixel(i,j, color);
       //outputImg.setPixel(i,j, Color(fabs(i/imgW),fabs(j/imgH),fabs(0))); //TODO: Try this, what is it visualizing?
     }

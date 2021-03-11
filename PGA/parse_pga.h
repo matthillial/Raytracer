@@ -62,13 +62,13 @@ class Sphere {
 vector<Sphere> spheres;
 
 //Light Stuff
-class Light {
+class DirectionalLight {
   public:
-  Point3D pos;
+  Point3D dir;
   Color color;
 };
 
-vector<Light> directionalLights;
+vector<DirectionalLight> directionalLights;
 Color ambient = Color(0, 0, 0);
 
 //Material Parameters
@@ -229,7 +229,7 @@ void parseSceneFile(std::string fileName){
       ss >> x;
       ss >> y;
       ss >> z;
-      directionalLights.push_back(Light{Point3D(x, y, z), Color(r, g, b)});
+      directionalLights.push_back(DirectionalLight{Point3D(x, y, z), Color(r, g, b)});
     }
 	
   }
