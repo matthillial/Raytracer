@@ -7,11 +7,12 @@ camera_up:  0 1 0
 camera_fov_ha: 35
 
 # Scene Set-up
+material: 0.2 0.2 0.2 1 1 1 0 0 0 0 0 0 0 1
 sphere: -3 1 0 0.7
 sphere: -2 1 2 2
-directional_light: 1 0 0 -4 5 0
-directional_light: 0 0 1 0 -1 -1
-ambient_light: 0 1 0
+directional_light: 0 1 0 -4 5 0
+directional_light: 0 0 1 0 1 1
+ambient_light: 0 0 1
 
 # Output/film Set-up
 image_resolution: 500 300

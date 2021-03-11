@@ -12,6 +12,8 @@
 #include <sstream>
 #include <vector>
 
+#include "image_lib.h" 
+
 #define MAXLINE 256
 
 //using namespace std;
@@ -21,23 +23,40 @@ using std::vector;
 //Here we set default values, override them in parseSceneFile()
 
 //Image Parmaters
-int img_width = 800, img_height = 600;
-std::string imgName = "raytraced.png";
+int img_width = 640, img_height = 480;
+std::string imgName = "raytraced.bmp";
+Color background = Color(0,0,0);
 
 
 
 //Camera Parmaters
 Point3D eye = Point3D(0,0,0); 
-Dir3D forward = Dir3D(0,0,-1).normalized();
+Dir3D forward = Dir3D(0,0,1).normalized();
 Dir3D up = Dir3D(0,1,0).normalized();
 Dir3D right = Dir3D(-1,0,0).normalized();
-float halfAngleVFOV = 35; 
+float halfAngleVFOV = 45; 
+
+//Materials
+class Material {
+  public:
+  Color ambient;
+  Color diffuse;
+  Color specular;
+  float ns;
+  Color transmissive;
+  float ior;
+};
+
+vector<Material> materials = {Material{Color(1,1,1),Color(1,1,1),Color(0,0,0),5, Color(0,0,0), 1}};
+int currentMaterial = 0;
+// materials.push_back(Material{0,0,0,1,1,1,0,0,0,0,0,0});
 
 //Scene (Sphere) Parmaters
 class Sphere {
   public:
   Point3D pos;
   float r;
+  int matIndex;
 };
 
 vector<Sphere> spheres;
@@ -51,6 +70,52 @@ class Light {
 
 vector<Light> directionalLights;
 Color ambient = Color(0, 0, 0);
+
+//Material Parameters
+
+
+float ar = 0;	//ambient
+float ag = 0;
+float ab = 0;
+
+float dr = 1;	//diffuse
+float dg = 1;
+float db = 1;
+
+float sr = 0;	//specular
+float sg = 0;
+float sb = 0;
+
+float ns = 5;	//phong cosine power for specular
+
+float tr = 0;	//transmissive
+float tg = 0;
+float tb = 0;	
+
+float ior = 1;	//index of refraction
+
+
+
+//Lighting Parameters
+float pointlight = 0;  		//point light
+float plr = 0; 
+float plg = 0;
+float plb = 0;
+float plx = 0;
+float ply = 0;
+float plz = 0;
+
+float ambr = 0;				//ambient light (default 0)
+float ambg = 0;
+float ambb = 0;
+
+
+float dirr = 0;
+float dirg = 0;
+float dirb = 0;
+Dir3D dirdir;
+
+
 
 void parseSceneFile(std::string fileName){
   //TODO: Override the default values with new data from the file "fileName"
@@ -69,32 +134,16 @@ void parseSceneFile(std::string fileName){
     ss >> word;
 
     if (word == "sphere:") {
+      
       float x, y, z, r;
       ss >> x;
       ss >> y;
       ss >> z;
       ss >> r;
-      spheres.push_back(Sphere{Point3D(x, y, z), r});
+      spheres.push_back(Sphere{Point3D(x, y, z), r, currentMaterial});
+      printf("Material: %d\n", spheres[spheres.size()-1].matIndex);
     }
-    else if (word == "ambient_light:") {
-      float r, g, b;
-      ss >> r;
-      ss >> g;
-      ss >> b;
-      ambient = Color(r, g, b);
-    }
-    else if (word == "directional_light:") {
-      float x, y, z, r, g, b;
-      ss >> r;
-      ss >> g;
-      ss >> b;
-      ss >> x;
-      ss >> y;
-      ss >> z;
-      pointLights.push_back(Light{Point3D(x, y, z), Color(r, g, b)});
-    }
-
-    else if (word == "image_resolution:") {
+    else if (word == "film_resolution:") {
       int w, h;
       ss >> w;
       ss >> h;
@@ -130,6 +179,59 @@ void parseSceneFile(std::string fileName){
       ss >> ha;
       halfAngleVFOV = ha;
     }
+	else if (word == "background:") {
+	  float r, g, b;
+	  ss >> r;
+	  ss >> g;
+	  ss >> b;
+	  background = Color(r,g,b);
+	}
+	else if (word == "material:") {
+    printf("Material set");
+    currentMaterial += 1;
+	  ss >> ar;
+	  ss >> ag;
+	  ss >> ab;
+	  ss >> dr;
+	  ss >> dg;
+	  ss >> db;
+	  ss >> sr;
+	  ss >> sg;
+	  ss >> sb;
+	  ss >> ns;
+	  ss >> tr;
+	  ss >> tg;
+	  ss >> tb;
+	  ss >> ior;
+		materials.push_back(Material{Color(ar, ag, ab), Color(dr, dg, db), Color(sr, sg, sb), ns, Color(tr, tg, tb), ior});
+	}
+	else if (word == "point_light:") {
+	  pointlight = 1;
+	  ss >> plr;
+	  ss >> plg;
+	  ss >> plb;
+	  ss >> plx;
+	  ss >> ply;
+	  ss >> plz;
+	}
+	else if (word == "ambient_light:") {
+      float r, g, b;
+      ss >> r;
+      ss >> g;
+      ss >> b;
+      ambient = Color(r, g, b);
+  }
+	else if (word == "directional_light:") {
+      float x, y, z, r, g, b;
+      ss >> r;
+      ss >> g;
+      ss >> b;
+      ss >> x;
+      ss >> y;
+      ss >> z;
+      directionalLights.push_back(Light{Point3D(x, y, z), Color(r, g, b)});
+    }
+	
   }
 
   if (abs(dot(up, forward)) == 1) {

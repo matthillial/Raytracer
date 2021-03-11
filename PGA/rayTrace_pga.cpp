@@ -99,29 +99,37 @@ int main(int argc, char** argv){
         float d = raySphereIntersect(eye,rayLine,spheres[x].pos,spheres[x].r);
         if (d < closeD) {
           closeD = d;
-          closeIndex = i;
+          closeIndex = x;
         }
       }
       Point3D closePoint = eye + (closeD - 0.01) * rayLine.dir();
+      Dir3D normal = closePoint - spheres[closeIndex].pos;
+      Material material = materials[spheres[closeIndex].matIndex];
+      Color mAmbient = material.ambient;
+      Color mDiffuse = material.diffuse;
+      Color mSpecular = material.specular;
+      Color mTransmissive = material.transmissive;
 
-      Color color = Color(0, 0, 0);
+      Color color = Color(mAmbient.r * ambient.r, mAmbient.g * ambient.g, mAmbient.b * ambient.b);
       //Check lighting
+      Dir3D lightDir;
       for(int lightI = 0; lightI < directionalLights.size(); lightI++) {
         Light currentLight = directionalLights[lightI];
         bool blocked = false;
         for(int sphereI = 0; sphereI < spheres.size(); sphereI ++) {
           Sphere currentSphere = spheres[sphereI];
-          rayDir = (currentLight.pos - closePoint);
-          rayLine = vee(closePoint, rayDir).normalized();
+          lightDir = (currentLight.pos - closePoint); // Change to inverse direction
+          rayLine = vee(closePoint, lightDir).normalized();
           if (raySphereIntersect(closePoint, rayLine, currentSphere.pos, currentSphere.r) < INF) {
             blocked = true;
             break;
           }
         }
         if (!blocked) {
-          float r = ambient.r + color.r + currentLight.color.r;
-          float g = ambient.g + color.g + currentLight.color.g;
-          float b = ambient.b + color.b + currentLight.color.b;
+          float difdot = (0 < dot(lightDir, normal)) ? dot(normal, lightDir) : 0;
+          float r = color.r + (currentLight.color.r * mDiffuse.r * difdot);
+          float g = color.g + (currentLight.color.g * mDiffuse.g * difdot);
+          float b = color.b + (currentLight.color.b * mDiffuse.b * difdot);
           color = Color(r, g, b);
         }
       }
