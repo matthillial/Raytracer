@@ -10,10 +10,12 @@
 #include <fstream>
 #include <cstring>
 #include <sstream>
+#include <vector>
 
 #define MAXLINE 256
 
 //using namespace std;
+using std::vector;
 
 //Camera & Scene Parmaters (Global Variables)
 //Here we set default values, override them in parseSceneFile()
@@ -32,8 +34,23 @@ Dir3D right = Dir3D(-1,0,0).normalized();
 float halfAngleVFOV = 35; 
 
 //Scene (Sphere) Parmaters
-Point3D spherePos = Point3D(0,0,2);
-float sphereRadius = 1; 
+class Sphere {
+  public:
+  Point3D pos;
+  float r;
+};
+
+vector<Sphere> spheres;
+
+//Light Stuff
+class Light {
+  public:
+  Point3D pos;
+  Color color;
+};
+
+vector<Light> directionalLights;
+Color ambient = Color(0, 0, 0);
 
 void parseSceneFile(std::string fileName){
   //TODO: Override the default values with new data from the file "fileName"
@@ -57,9 +74,26 @@ void parseSceneFile(std::string fileName){
       ss >> y;
       ss >> z;
       ss >> r;
-      spherePos = Point3D(x, y, z);
-      sphereRadius = r;
+      spheres.push_back(Sphere{Point3D(x, y, z), r});
     }
+    else if (word == "ambient_light:") {
+      float r, g, b;
+      ss >> r;
+      ss >> g;
+      ss >> b;
+      ambient = Color(r, g, b);
+    }
+    else if (word == "directional_light:") {
+      float x, y, z, r, g, b;
+      ss >> r;
+      ss >> g;
+      ss >> b;
+      ss >> x;
+      ss >> y;
+      ss >> z;
+      pointLights.push_back(Light{Point3D(x, y, z), Color(r, g, b)});
+    }
+
     else if (word == "image_resolution:") {
       int w, h;
       ss >> w;

@@ -30,6 +30,9 @@
 //Scene file parser
 #include "parse_pga.h"
 
+#include <limits>
+#define INF std::numeric_limits<float>::infinity()
+
 bool raySphereIntersect_fast(Point3D rayStart, Line3D rayLine, Point3D sphereCenter, float sphereRadius){
   Dir3D dir = rayLine.dir();
   float a = dot(dir,dir);
@@ -46,18 +49,20 @@ bool raySphereIntersect_fast(Point3D rayStart, Line3D rayLine, Point3D sphereCen
   return false;
 }
 
-bool raySphereIntersect(Point3D rayStart, Line3D rayLine, Point3D sphereCenter, float sphereRadius){
+float raySphereIntersect(Point3D rayStart, Line3D rayLine, Point3D sphereCenter, float sphereRadius){
   Point3D projPoint = dot(rayLine,sphereCenter)*rayLine;      //Project to find closest point between circle center and line [proj(sphereCenter,rayLine);]
   float distSqr = projPoint.distToSqr(sphereCenter);          //Point-line distance (squared)
-  float d2 = distSqr/(sphereRadius*sphereRadius);             //If distance is larger than radius, then...
-  if (d2 > 1) return false;                                   //... the ray missed the sphere
-  float w = sphereRadius*sqrt(1-d2);                          //Pythagorean theorem to determine dist between proj point and intersection points
+  float d = distSqr/(sphereRadius*sphereRadius);             //If distance is larger than radius, then...
+  if (d > 1) return INF;                                     //... the ray missed the sphere
+  float w = sphereRadius*sqrt(1-d);                          //Pythagorean theorem to determine dist between proj point and intersection points
   Point3D p1 = projPoint - rayLine.dir()*w;                   //Add/subtract above distance to find hit points
   Point3D p2 = projPoint + rayLine.dir()*w; 
+  float d1 = (p1 - rayStart).magnitude();
+  float d2 = (p2 - rayStart).magnitude();
 
-  if (dot((p1-rayStart),rayLine.dir()) >= 0) return true;     //Is the first point in same direction as the ray line?
-  if (dot((p2-rayStart),rayLine.dir()) >= 0) return true;     //Is the second point in same direction as the ray line?
-  return false;
+  if (dot((p1-rayStart),rayLine.dir()) >= 0 ) return d1;     //Is the first point in same direction as the ray line?
+  if (dot((p2-rayStart),rayLine.dir()) >= 0 ) return d2;     //Is the second point in same direction as the ray line?
+  return INF;
 }
 
 int main(int argc, char** argv){
@@ -86,10 +91,44 @@ int main(int argc, char** argv){
       Point3D p = eye - d*forward + u*right + v*up;
       Dir3D rayDir = (p - eye); 
       Line3D rayLine = vee(eye,rayDir).normalized();  //Normalizing here is optional
-      bool hit = raySphereIntersect(eye,rayLine,spherePos,sphereRadius);
-      Color color;
-      if (hit) color = Color(1,1,1);
-      else color = Color(0,0,0);
+
+      //Calculate closest intersection
+      float closeD = INF; // Distance to nearest sphere
+      int closeIndex = -1; // Index of nearest sphere
+      for(int x = 0; x < spheres.size(); x++) {
+        float d = raySphereIntersect(eye,rayLine,spheres[x].pos,spheres[x].r);
+        if (d < closeD) {
+          closeD = d;
+          closeIndex = i;
+        }
+      }
+      Point3D closePoint = eye + (closeD - 0.01) * rayLine.dir();
+
+      Color color = Color(0, 0, 0);
+      //Check lighting
+      for(int lightI = 0; lightI < directionalLights.size(); lightI++) {
+        Light currentLight = directionalLights[lightI];
+        bool blocked = false;
+        for(int sphereI = 0; sphereI < spheres.size(); sphereI ++) {
+          Sphere currentSphere = spheres[sphereI];
+          rayDir = (currentLight.pos - closePoint);
+          rayLine = vee(closePoint, rayDir).normalized();
+          if (raySphereIntersect(closePoint, rayLine, currentSphere.pos, currentSphere.r) < INF) {
+            blocked = true;
+            break;
+          }
+        }
+        if (!blocked) {
+          float r = ambient.r + color.r + currentLight.color.r;
+          float g = ambient.g + color.g + currentLight.color.g;
+          float b = ambient.b + color.b + currentLight.color.b;
+          color = Color(r, g, b);
+        }
+      }
+      
+      // Color color;
+      // if (closeIndex >= 0) color = Color(1,1,1);
+      // else color = Color(0,0,0);
       outputImg.setPixel(i,j, color);
       //outputImg.setPixel(i,j, Color(fabs(i/imgW),fabs(j/imgH),fabs(0))); //TODO: Try this, what is it visualizing?
     }
