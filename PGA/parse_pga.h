@@ -39,20 +39,25 @@ Point3D spherePos = Point3D(0,0,2);
 float sphereRadius = 1; 
 
 //Material Parameters
-float ar = 0;
+float ar = 0;	//ambient
 float ag = 0;
 float ab = 0;
-float dr = 1;
+
+float dr = 1;	//diffuse
 float dg = 1;
 float db = 1;
-float sr = 0;
+
+float sr = 0;	//specular
 float sg = 0;
 float sb = 0;
-float ns = 5;
-float tr = 0;
+
+float ns = 5;	//phong cosine power for specular
+
+float tr = 0;	//transmissive
 float tg = 0;
-float tb = 0;
-float ior = 1;
+float tb = 0;	
+
+float ior = 1;	//index of refraction
 
 
 
@@ -68,6 +73,12 @@ float plz = 0;
 float ambr = 0;				//ambient light (default 0)
 float ambg = 0;
 float ambb = 0;
+
+
+float dirr = 0;
+float dirg = 0;
+float dirb = 0;
+Dir3D dirdir;
 
 
 
@@ -171,6 +182,17 @@ void parseSceneFile(std::string fileName){
 	  ss >> ambr;
 	  ss >> ambg;
 	  ss >> ambb;
+	}
+	else if (word == "directional_light:") {
+	  ss >> dirr;
+	  ss >> dirg;
+	  ss >> dirb;
+	  
+	  float x, y, z;
+	  ss >> x;
+	  ss >> y;
+	  ss >> z;
+	  dirdir = Dir3D(x,y,z).normalized;
 	}
 	
   }
