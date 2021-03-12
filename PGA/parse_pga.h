@@ -122,6 +122,8 @@ float dirg = 0;
 float dirb = 0;
 Dir3D dirdir;
 
+int max_depth = 2;
+
 
 
 void parseSceneFile(std::string fileName){
@@ -239,8 +241,15 @@ void parseSceneFile(std::string fileName){
       ss >> z;
       directionalLights.push_back(DirLight{Point3D(x, y, z), Color(r, g, b)});
     }
+  else if (word == "max_depth:") {
+    int d;
+    ss >> d;
+    printf("%d", d);
+    max_depth = d;
+  }
 	
   }
+  
 
   if (abs(dot(up, forward)) == 1) {
     printf("ERROR: Up and forward vectors are parallel, no orthogonal basis can be found");

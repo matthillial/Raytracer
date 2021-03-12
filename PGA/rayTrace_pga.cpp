@@ -65,40 +65,12 @@ float raySphereIntersect(Point3D rayStart, Line3D rayLine, Point3D sphereCenter,
   return INF;
 }
 
-int main(int argc, char** argv){
-  
-  //Read command line paramaters to get scene file
-  if (argc != 2){
-     std::cout << "Usage: ./a.out scenefile\n";
-     return(0);
-  }
-  std::string secenFileName = argv[1];
-
-  //Parse Scene File
-  parseSceneFile(secenFileName);
-
-  float imgW = img_width, imgH = img_height;
-  float halfW = imgW/2, halfH = imgH/2;
-  float d = halfH / tanf(halfAngleVFOV * (M_PI / 180.0f));
-
-  Image outputImg = Image(img_width,img_height);
-  auto t_start = std::chrono::high_resolution_clock::now();
-
-  // Loop through each pixel
-  for (int i = 0; i < img_width; i++){
-    for (int j = 0; j < img_height; j++){
-      //TODO: In what way does this assumes the basis is orthonormal?
-      float u = (halfW - (imgW)*((i+0.5)/imgW));
-      float v = (halfH - (imgH)*((j+0.5)/imgH));
-      Point3D p = eye - d*forward + u*right + v*up;
-      Dir3D rayDir = (p - eye); 
-      Line3D rayLine = vee(eye,rayDir).normalized();  //Normalizing here is optional
-
+Color rayCast(Point3D start, Dir3D rayDir, Line3D rayLine, int recursionDepth) {
       // Calculate closest intersection
       float closeD = INF; // Distance to nearest sphere
       int closeIndex = -1; // Index of nearest sphere
       for(int x = 0; x < spheres.size(); x++) {
-        float d = raySphereIntersect(eye,rayLine,spheres[x].pos,spheres[x].r);
+        float d = raySphereIntersect(start,rayLine,spheres[x].pos,spheres[x].r);
         if (d < closeD) {
           closeD = d;
           closeIndex = x;
@@ -108,7 +80,8 @@ int main(int argc, char** argv){
       // Calculate color of point
       Color color;
       if (closeIndex >= 0) {
-        Point3D closePoint = eye + (closeD - 0.01) * rayLine.dir();
+        Point3D closePoint = start + (closeD - 0.01) * rayLine.dir();
+        Point3D insidePoint = start + (closeD + 0.01) * rayLine.dir();
         Dir3D normal = (closePoint - spheres[closeIndex].pos).normalized();
 
         Material material = materials[spheres[closeIndex].matIndex];
@@ -138,7 +111,7 @@ int main(int argc, char** argv){
 
           // Add light into composite color if it isn't blocked
           if (!blocked) {
-            Dir3D viewDir = (eye - closePoint).normalized();
+            Dir3D viewDir = (start - closePoint).normalized();
             Dir3D halfway = (lightDir + viewDir).normalized();
             float difdot = (0 < dot(lightDir, normal)) ? dot(normal, lightDir) : 0;
             float specdot = (0 < pow(dot(halfway,normal),ns)) ? pow(dot(halfway,normal),ns) : 0;
@@ -169,7 +142,7 @@ int main(int argc, char** argv){
           
           // Add light to composite color if light isn't blocked
           if (!blocked) {
-            Dir3D viewDir = (eye - closePoint).normalized();
+            Dir3D viewDir = (start - closePoint).normalized();
             Dir3D halfway = (lightDir + viewDir).normalized();
             float falloff = pow(closePoint.distTo(currentLight.pos),2);
       
@@ -184,10 +157,59 @@ int main(int argc, char** argv){
             color = Color(r, g, b);
           }
         }
+
+        // Calculate transparency
+        if ((mTransmissive.r > 0 || mTransmissive.g > 0 || mTransmissive.b > 0) && recursionDepth < max_depth) {
+          float incidentAngle = acos(dot(rayLine, vee(closePoint, normal).normalized()));
+          //float incidentAngle = acos(dot(0-rayDir, normal));
+          float refractionAngle = asin((1/material.ior) * sin(incidentAngle));
+          Dir3D tDir = ((1/material.ior) * cos(incidentAngle) - cos(refractionAngle)) * normal - (1/material.ior) * (eye - closePoint).normalized();
+          Color tColor = rayCast(insidePoint, tDir, vee(closePoint, tDir).normalized(), recursionDepth+1);
+          //Color tColor = rayCast(insidePoint, rayDir, vee(insidePoint, rayDir).normalized(), recursionDepth+1);
+          float r = color.r + mTransmissive.r * tColor.r;
+          float g = color.g + mTransmissive.g * tColor.g;
+          float b = color.b + mTransmissive.b * tColor.b;
+          color = Color(r, g, b);
+        }
+
       }
       else {
         color = background;
       }
+
+      return color;
+}
+
+int main(int argc, char** argv){
+  
+  //Read command line paramaters to get scene file
+  if (argc != 2){
+     std::cout << "Usage: ./a.out scenefile\n";
+     return(0);
+  }
+  std::string secenFileName = argv[1];
+
+  //Parse Scene File
+  parseSceneFile(secenFileName);
+
+  float imgW = img_width, imgH = img_height;
+  float halfW = imgW/2, halfH = imgH/2;
+  float d = halfH / tanf(halfAngleVFOV * (M_PI / 180.0f));
+
+  Image outputImg = Image(img_width,img_height);
+  auto t_start = std::chrono::high_resolution_clock::now();
+
+  // Loop through each pixel
+  for (int i = 0; i < img_width; i++){
+    for (int j = 0; j < img_height; j++){
+      //TODO: In what way does this assumes the basis is orthonormal?
+      float u = (halfW - (imgW)*((i+0.5)/imgW));
+      float v = (halfH - (imgH)*((j+0.5)/imgH));
+      Point3D p = eye - d*forward + u*right + v*up;
+      Dir3D rayDir = (p - eye); 
+      Line3D rayLine = vee(eye,rayDir).normalized();  //Normalizing here is optional
+
+      Color color = rayCast(eye, rayDir, rayLine, 0);
       
       outputImg.setPixel(i,j, color);
       //outputImg.setPixel(i,j, Color(fabs(i/imgW),fabs(j/imgH),fabs(0))); //TODO: Try this, what is it visualizing?
