@@ -83,6 +83,8 @@ int main(int argc, char** argv){
 
   Image outputImg = Image(img_width,img_height);
   auto t_start = std::chrono::high_resolution_clock::now();
+
+  // Loop through each pixel
   for (int i = 0; i < img_width; i++){
     for (int j = 0; j < img_height; j++){
       //TODO: In what way does this assumes the basis is orthonormal?
@@ -103,10 +105,12 @@ int main(int argc, char** argv){
         }
       }
 
+      // Calculate color of point
       Color color;
       if (closeIndex >= 0) {
         Point3D closePoint = eye + (closeD - 0.01) * rayLine.dir();
-        Dir3D normal = closePoint - spheres[closeIndex].pos;
+        Dir3D normal = (closePoint - spheres[closeIndex].pos).normalized();
+
         Material material = materials[spheres[closeIndex].matIndex];
         Color mAmbient = material.ambient;
         Color mDiffuse = material.diffuse;
@@ -118,9 +122,11 @@ int main(int argc, char** argv){
 
         // Check directional lights
         for(int lightI = 0; lightI < directionalLights.size(); lightI++) {
-          DirectionalLight currentLight = directionalLights[lightI];
+          DirLight currentLight = directionalLights[lightI];
           Dir3D lightDir = -1 * currentLight.dir;
           Line3D lightLine = vee(closePoint, lightDir).normalized();
+
+          // Check all spheres to see if light is blocked
           bool blocked = false;
           for(int sphereI = 0; sphereI < spheres.size(); sphereI ++) {
             Sphere currentSphere = spheres[sphereI];
@@ -132,10 +138,49 @@ int main(int argc, char** argv){
 
           // Add light into composite color if it isn't blocked
           if (!blocked) {
+            Dir3D viewDir = (eye - closePoint).normalized();
+            Dir3D halfway = (lightDir + viewDir).normalized();
             float difdot = (0 < dot(lightDir, normal)) ? dot(normal, lightDir) : 0;
+            float specdot = (0 < pow(dot(halfway,normal),ns)) ? pow(dot(halfway,normal),ns) : 0;
+
             float r = color.r + (currentLight.color.r * mDiffuse.r * difdot);
             float g = color.g + (currentLight.color.g * mDiffuse.g * difdot);
             float b = color.b + (currentLight.color.b * mDiffuse.b * difdot);
+            color = Color(r, g, b);
+          }
+        }
+
+        // Check point lights
+        for(int lightI = 0; lightI < pointLights.size(); lightI++) {
+          PointLight currentLight = pointLights[lightI];
+          Color lightColor = currentLight.color;
+          Dir3D lightDir = (currentLight.pos - closePoint).normalized();
+          Line3D lightLine = vee(closePoint, lightDir).normalized();
+
+          // Check all spheres to see if light is blocked
+          bool blocked = false;
+          for(int sphereI = 0; sphereI < spheres.size(); sphereI ++) {
+            Sphere currentSphere = spheres[sphereI];
+            if (raySphereIntersect(closePoint, lightLine, currentSphere.pos, currentSphere.r) < INF) {
+              blocked = true;
+              break;
+            }
+          }
+          
+          // Add light to composite color if light isn't blocked
+          if (!blocked) {
+            Dir3D viewDir = (eye - closePoint).normalized();
+            Dir3D halfway = (lightDir + viewDir).normalized();
+            float falloff = pow(closePoint.distTo(currentLight.pos),2);
+      
+            //cosine falloffs
+            float difdot = (0 < dot(lightDir,normal)) ? dot(normal,lightDir) : 0;
+            float specdot = (0 < pow(dot(halfway,normal),material.ns)) ? pow(dot(halfway,normal),material.ns) : 0;
+      
+            //point light r g b values
+            float r = color.r + (mDiffuse.r * (lightColor.r / falloff) * difdot) + (mSpecular.r * (lightColor.r / falloff) * specdot);
+            float g = color.g + (mDiffuse.g * (lightColor.g / falloff) * difdot) + (mSpecular.g * (lightColor.g / falloff) * specdot);
+            float b = color.b + (mDiffuse.b * (lightColor.b / falloff) * difdot) + (mSpecular.b * (lightColor.b / falloff) * specdot);
             color = Color(r, g, b);
           }
         }

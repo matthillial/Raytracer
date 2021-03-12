@@ -62,13 +62,20 @@ class Sphere {
 vector<Sphere> spheres;
 
 //Light Stuff
-class DirectionalLight {
+class DirLight {
   public:
   Point3D dir;
   Color color;
 };
 
-vector<DirectionalLight> directionalLights;
+class PointLight {
+  public:
+  Point3D pos;
+  Color color;
+};
+
+vector<DirLight> directionalLights;
+vector<PointLight> pointLights;
 Color ambient = Color(0, 0, 0);
 
 //Material Parameters
@@ -213,6 +220,7 @@ void parseSceneFile(std::string fileName){
 	  ss >> plx;
 	  ss >> ply;
 	  ss >> plz;
+    pointLights.push_back(PointLight{Point3D(plx, ply, plz), Color(plr, plg, plb)});
 	}
 	else if (word == "ambient_light:") {
       float r, g, b;
@@ -229,7 +237,7 @@ void parseSceneFile(std::string fileName){
       ss >> x;
       ss >> y;
       ss >> z;
-      directionalLights.push_back(DirectionalLight{Point3D(x, y, z), Color(r, g, b)});
+      directionalLights.push_back(DirLight{Point3D(x, y, z), Color(r, g, b)});
     }
 	
   }
