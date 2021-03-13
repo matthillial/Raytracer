@@ -65,7 +65,7 @@ float raySphereIntersect(Point3D rayStart, Line3D rayLine, Point3D sphereCenter,
   return INF;
 }
 
-Color rayCast(Point3D start, Dir3D rayDir, Line3D rayLine, int recursionDepth) {
+Color rayCast(Point3D start, Dir3D rayDir, Line3D rayLine, int recursionDepth, bool debug) {
       // Calculate closest intersection
       float closeD = INF; // Distance to nearest sphere
       int closeIndex = -1; // Index of nearest sphere
@@ -81,7 +81,7 @@ Color rayCast(Point3D start, Dir3D rayDir, Line3D rayLine, int recursionDepth) {
       Color color;
       if (closeIndex >= 0) {
         Point3D closePoint = start + (closeD - 0.01) * rayLine.dir();
-        Point3D insidePoint = start + (closeD + 0.01) * rayLine.dir();
+        Point3D insidePoint = start + (closeD + 0.00001) * rayLine.dir();
         Dir3D normal = (closePoint - spheres[closeIndex].pos).normalized();
 
         Material material = materials[spheres[closeIndex].matIndex];
@@ -160,11 +160,14 @@ Color rayCast(Point3D start, Dir3D rayDir, Line3D rayLine, int recursionDepth) {
 
         // Calculate transparency
         if ((mTransmissive.r > 0 || mTransmissive.g > 0 || mTransmissive.b > 0) && recursionDepth < max_depth) {
-          float incidentAngle = acos(dot(rayLine, vee(closePoint, normal).normalized()));
-          //float incidentAngle = acos(dot(0-rayDir, normal));
+          //float incidentAngle = acos(dot((-1)*rayLine, vee(closePoint, normal).normalized()));
+          float incidentAngle = acos(dot(vee(closePoint,(start-closePoint)).normalized(), vee(closePoint, normal).normalized()));
           float refractionAngle = asin((1/material.ior) * sin(incidentAngle));
+          if (debug) {
+            printf("incident: %f, refracted: %f\n", incidentAngle, refractionAngle);
+          }
           Dir3D tDir = ((1/material.ior) * cos(incidentAngle) - cos(refractionAngle)) * normal - (1/material.ior) * (eye - closePoint).normalized();
-          Color tColor = rayCast(insidePoint, tDir, vee(closePoint, tDir).normalized(), recursionDepth+1);
+          Color tColor = rayCast(insidePoint, tDir, vee(closePoint, tDir).normalized(), recursionDepth+1, false);
           //Color tColor = rayCast(insidePoint, rayDir, vee(insidePoint, rayDir).normalized(), recursionDepth+1);
           float r = color.r + mTransmissive.r * tColor.r;
           float g = color.g + mTransmissive.g * tColor.g;
@@ -209,7 +212,7 @@ int main(int argc, char** argv){
       Dir3D rayDir = (p - eye); 
       Line3D rayLine = vee(eye,rayDir).normalized();  //Normalizing here is optional
 
-      Color color = rayCast(eye, rayDir, rayLine, 0);
+      Color color = rayCast(eye, rayDir, rayLine, 0, (i == 50 && j == 250) ? true : false);
       
       outputImg.setPixel(i,j, color);
       //outputImg.setPixel(i,j, Color(fabs(i/imgW),fabs(j/imgH),fabs(0))); //TODO: Try this, what is it visualizing?
