@@ -80,8 +80,8 @@ Color rayCast(Point3D start, Dir3D rayDir, Line3D rayLine, int recursionDepth, b
       // Calculate color of point
       Color color;
       if (closeIndex >= 0) {
-        Point3D closePoint = start + (closeD - 0.01) * rayLine.dir();
-        Point3D insidePoint = start + (closeD + 0.00001) * rayLine.dir();
+        Point3D closePoint = start + (closeD - 0.001) * rayLine.dir();
+        Point3D insidePoint = start + (closeD + 0.0001) * rayLine.dir();
         Dir3D normal = (closePoint - spheres[closeIndex].pos).normalized();
 
         Material material = materials[spheres[closeIndex].matIndex];
@@ -158,21 +158,26 @@ Color rayCast(Point3D start, Dir3D rayDir, Line3D rayLine, int recursionDepth, b
           }
         }
 
+        float incidentAngle = acos(dot(vee(closePoint,(start-closePoint)).normalized(), vee(closePoint, normal).normalized()));
+
         // Calculate transparency
         if ((mTransmissive.r > 0 || mTransmissive.g > 0 || mTransmissive.b > 0) && recursionDepth < max_depth) {
-          //float incidentAngle = acos(dot((-1)*rayLine, vee(closePoint, normal).normalized()));
-          float incidentAngle = acos(dot(vee(closePoint,(start-closePoint)).normalized(), vee(closePoint, normal).normalized()));
+          
           float refractionAngle = asin((1/material.ior) * sin(incidentAngle));
-          if (debug) {
-            printf("incident: %f, refracted: %f\n", incidentAngle, refractionAngle);
-          }
-          Dir3D tDir = ((1/material.ior) * cos(incidentAngle) - cos(refractionAngle)) * normal - (1/material.ior) * (eye - closePoint).normalized();
-          Color tColor = rayCast(insidePoint, tDir, vee(closePoint, tDir).normalized(), recursionDepth+1, false);
-          //Color tColor = rayCast(insidePoint, rayDir, vee(insidePoint, rayDir).normalized(), recursionDepth+1);
+          Dir3D tDir = ((1/material.ior) * cos(incidentAngle) - cos(refractionAngle)) * normal - (1/material.ior) * (start - closePoint).normalized();
+          Color tColor = rayCast(insidePoint, tDir, vee(insidePoint, tDir).normalized(), recursionDepth+1, false);
+          //Color tColor = rayCast(insidePoint, tDir, vee(closePoint, tDir).normalized(), recursionDepth+1, false);
+          //Color tColor = rayCast(insidePoint, rayDir, rayLine, recursionDepth+1, false);
           float r = color.r + mTransmissive.r * tColor.r;
           float g = color.g + mTransmissive.g * tColor.g;
           float b = color.b + mTransmissive.b * tColor.b;
           color = Color(r, g, b);
+        }
+
+        // Calculate reflection
+        if ((mSpecular.r > 0 || mSpecular.g > 0 || mSpecular.b > 0) && recursionDepth < max_depth) {
+          Dir3D reflectionDir = rayDir + dot(rayDir, normal)*normal*-2;
+          Color rColor = rayCast(closePoint, reflectionDir, vee(closePoint, reflectionDir).normalized(), recursionDepth+1, false);
         }
 
       }
@@ -212,7 +217,7 @@ int main(int argc, char** argv){
       Dir3D rayDir = (p - eye); 
       Line3D rayLine = vee(eye,rayDir).normalized();  //Normalizing here is optional
 
-      Color color = rayCast(eye, rayDir, rayLine, 0, (i == 50 && j == 250) ? true : false);
+      Color color = rayCast(eye, rayDir, rayLine, 0, false);
       
       outputImg.setPixel(i,j, color);
       //outputImg.setPixel(i,j, Color(fabs(i/imgW),fabs(j/imgH),fabs(0))); //TODO: Try this, what is it visualizing?

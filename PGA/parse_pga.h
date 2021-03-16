@@ -150,7 +150,6 @@ void parseSceneFile(std::string fileName){
       ss >> z;
       ss >> r;
       spheres.push_back(Sphere{Point3D(x, y, z), r, currentMaterial});
-      printf("Material: %d\n", spheres[spheres.size()-1].matIndex);
     }
     else if (word == "film_resolution:") {
       int w, h;
@@ -196,7 +195,6 @@ void parseSceneFile(std::string fileName){
 	  background = Color(r,g,b);
 	}
 	else if (word == "material:") {
-    printf("Material set");
     currentMaterial += 1;
 	  ss >> ar;
 	  ss >> ag;
