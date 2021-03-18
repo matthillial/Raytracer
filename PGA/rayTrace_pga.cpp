@@ -65,8 +65,23 @@ float raySphereIntersect(Point3D rayStart, Line3D rayLine, Point3D sphereCenter,
   return INF;
 }
 
+
+float rayPlaneIntersect(Point3D rayStart, Line3D rayLine, Point3D v1, Point3D v2, Point3D v3){
+  Plane3D triPlane = vee(v1, v2, v3);	//make plane
+  Point3D hitPoint = Point3D(wedge(rayLine,triPlane));
+  if ((dot(vee(v1,v2,hitPoint),triPlane) >= 0) && (dot(vee(v2,v3,hitPoint),triPlane) >= 0) && (dot(vee(v3,v1,hitPoint), triPlane) >= 0)) {
+    float d = (hitPoint - rayStart).magnitude();
+    return d;
+  }
+  return INF;
+}
+
 Color rayCast(Point3D start, Dir3D rayDir, Line3D rayLine, int recursionDepth, bool debug) {
-      // Calculate closest intersection
+	  //variables for differentiating between sphere and triangle and triangle(normals specified)
+	  float dif = -1;
+		
+	
+      // Calculate closest intersection for spheres
       float closeD = INF; // Distance to nearest sphere
       int closeIndex = -1; // Index of nearest sphere
       for(int x = 0; x < spheres.size(); x++) {
@@ -76,10 +91,50 @@ Color rayCast(Point3D start, Dir3D rayDir, Line3D rayLine, int recursionDepth, b
           closeIndex = x;
         }
       }
+      
+      
+      // Calculate closest intersection for triangles(non specified normals)
+      float closeDTriangle = INF;	// Distance to nearest triangle
+      int closeTriangleIndex = -1;  // Index of nearest triangle
+      for(int x = 0; x < triangles.size(); x++) {
+		 float d = rayPlaneIntersect(start, rayLine, vertex[triangles[x].v1], vertex[triangles[x].v2], vertex[triangles[x].v3]);
+		 if (d < closeDTriangle) {
+		   closeDTriangle = d;
+		   closeTriangleIndex = x;
+		 }
+	  }
+	  
+	  // Calculate closest interesection for triangles(specified normals)
+	  float closeDNormalTriangle = INF;	// Distance to nearest triangle
+      int closeNormalTriangleIndex = -1;  // Index of nearest triangle
+      for(int x = 0; x < normaltriangles.size(); x++) {
+		 float d = rayPlaneIntersect(start, rayLine, vertex[normaltriangles[x].v1], vertex[normaltriangles[x].v2], vertex[normaldtriangles[x].v3]);
+		 if (d < closeDTriangle) {
+		   closeDNormalTriangle = d;
+		   closeNormalTriangleIndex = x;
+		 }
+	  }
+	  
+	  
+	  // Calculate which intersection is the closest between all the primitives || dif = 0 for spheres || dif = 1 for triangle (normals not specified) || dif = 2 for traingles (normals specified)
+	  if (closeD < closeDTriangle && closeD < closeDNormalTriangle) {
+		dif = 0;
+	  }
+	  else if (closeDTriangle < closeD && closeDTriangle < closeDNormalTriangle) {
+		dif = 1;
+	  }
+	  else if (closeDNormalTriangle < closeD && closeDNormalTriangle < closeDTriangle) {
+		dif = 2;
+	  }
+	  
+	  
+      
+      
+      
 
-      // Calculate color of point
+      // Calculate color of point for sphere
       Color color;
-      if (closeIndex >= 0) {
+      if (closeIndex >= 0 && dif == 0) {
         Point3D closePoint = start + (closeD - 0.001) * rayLine.dir();
         Point3D insidePoint = start + (closeD + 0.0001) * rayLine.dir();
         Dir3D normal = (closePoint - spheres[closeIndex].pos).normalized();
@@ -181,6 +236,20 @@ Color rayCast(Point3D start, Dir3D rayDir, Line3D rayLine, int recursionDepth, b
         }
 
       }
+      
+      //calculate color for a Triangle(non specified normal)
+	  else if (closeTriangleIndex >= 0 && dif == 1) {
+	    // apply coloring 
+	   
+	  }
+	  
+	  
+	  //calculate color for a Triangle (specified normal)
+	  else if (closeNormalTriangleIndex >= 0 && dif == 2) {
+	    // apply coloring 
+	   
+	  }
+      
       else {
         color = background;
       }

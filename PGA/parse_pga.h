@@ -31,7 +31,7 @@ Color background = Color(0,0,0);
 
 //Camera Parmaters
 Point3D eye = Point3D(0,0,0); 
-Dir3D forward = Dir3D(0,0,1).normalized();
+Dir3D forward = Dir3D(0,0,-1).normalized();
 Dir3D up = Dir3D(0,1,0).normalized();
 Dir3D right = Dir3D(-1,0,0).normalized();
 float halfAngleVFOV = 45; 
@@ -60,6 +60,32 @@ class Sphere {
 };
 
 vector<Sphere> spheres;
+
+//Triangles
+int maxVertices = -1;
+int maxNormals = -1;
+
+vector<Point3D> vertex;
+vector<Dir3D> normal;
+
+class Triangle {
+	public:
+	int v1, v2, v3;
+	int matIndex;
+};
+
+vector<Triangle> triangles;
+
+class NormalTriangle {
+	public:
+	int v1, v2, v3;
+	int n1, n2, n3;
+	int matIndex;
+};
+
+vector<NormalTriangle> normaltriangles;
+
+
 
 //Light Stuff
 class DirLight {
@@ -245,6 +271,63 @@ void parseSceneFile(std::string fileName){
     printf("%d", d);
     max_depth = d;
   }
+	
+   else if (word == "max_vertices:") {
+    ss >> maxVertices;
+    printf("Max Vertices: %d", maxVertices);
+  }
+  
+   else if (word == "max_normals:") {
+    ss >> maxNormals;
+    printf("Max Normals: %d", maxNormals);
+  }
+	
+   else if (word == "vertex:") {
+	if(maxVertices == -1){
+		printf("ERROR: Specifying a vertex before specifying max_vertices!");
+		exit(0);
+	}
+	float a, b, c;
+    ss >> a;
+    ss >> b;
+    ss >> c;
+    vertex.push_back(Point3D(a,b,c));
+  }
+  
+  else if (word == "normal:") {
+	if(maxNormals == -1){
+		printf("ERROR: Specifying a normal before specifying max_normals!");
+		exit(0);
+	}
+	float a, b, c;
+    ss >> a;
+    ss >> b;
+    ss >> c;
+    normal.push_back(Dir3D(a,b,c));
+  }
+  
+  else if (word == "triangle:") {
+	int a, b, c;
+    ss >> a;
+    ss >> b;
+    ss >> c;
+    triangles.push_back(Triangle{a,b,c,currentMaterial});
+  }
+  
+  
+  else if (word == "normal_triangle:") {
+	int a, b, c;
+	int d, e, f;
+    ss >> a;
+    ss >> b;
+    ss >> c;
+    ss >> d;
+    ss >> e;
+    ss >> f;
+    normaltriangles.push_back(NormalTriangle{a,b,c,d,e,f,currentMaterial});
+  }
+  
+  
 	
   }
   
