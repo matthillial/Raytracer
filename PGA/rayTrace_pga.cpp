@@ -65,7 +65,17 @@ float raySphereIntersect(Point3D rayStart, Line3D rayLine, Point3D sphereCenter,
   return INF;
 }
 
-Color rayCast(Point3D start, Dir3D rayDir, Line3D rayLine, int recursionDepth, bool debug) {
+Dir3D* refract(Dir3D in, Dir3D normal, float n, bool debug) {
+  in = in.normalized();
+  normal = normal.normalized();
+  if (debug) printf("\tn: %f\n", n);
+  float ndotu = dot(normal, in);
+  float root = 1 - (n*n) + (ndotu*ndotu)*(n*n);
+  if (root < 0) return NULL;
+  return new Dir3D((( ( ((ndotu > 0) - (ndotu < 0)) * sqrt(root) ) - (ndotu*n) ) * normal) + (n*in));
+}
+
+Color rayCast(Point3D start, Dir3D rayDir, Line3D rayLine, int recursionDepth, float startIor, bool debug) {
       // Calculate closest intersection
       float closeD = INF; // Distance to nearest sphere
       int closeIndex = -1; // Index of nearest sphere
@@ -84,6 +94,9 @@ Color rayCast(Point3D start, Dir3D rayDir, Line3D rayLine, int recursionDepth, b
         Point3D insidePoint = start + (closeD + 0.0001) * rayLine.dir();
         Dir3D normal = (closePoint - spheres[closeIndex].pos).normalized();
 
+        if (debug) {
+          printf("material index: %d\n", closeIndex);
+        }
         Material material = materials[spheres[closeIndex].matIndex];
         Color mAmbient = material.ambient;
         Color mDiffuse = material.diffuse;
@@ -158,31 +171,86 @@ Color rayCast(Point3D start, Dir3D rayDir, Line3D rayLine, int recursionDepth, b
           }
         }
 
-        float incidentAngle = acos(dot(vee(closePoint,(start-closePoint)).normalized(), vee(closePoint, normal).normalized()));
+        // float incidentAngle = acos(dot(vee(closePoint,(start-closePoint)).normalized(), vee(closePoint, normal).normalized()));
+        // float angleCorrection;
+        // if (incidentAngle > M_PI/2) {
+        //   angleCorrection = 2*(incidentAngle - M_PI/2);
+        // } else { angleCorrection = 0; }
 
         // Calculate transparency
         if ((mTransmissive.r > 0 || mTransmissive.g > 0 || mTransmissive.b > 0) && recursionDepth < max_depth) {
+          rayDir = rayDir.normalized();
+
+          // reflection
+          Dir3D reflectionDir = rayDir + dot(rayDir, normal)*normal*-2;
+          Color rColor = rayCast(closePoint, reflectionDir, vee(closePoint, reflectionDir).normalized(), recursionDepth+1, -1, false);
+
+          // refraction
+          float n = 1/material.ior;
+          if (debug) printf("n: %f\n", n);
+          Dir3D* tDir;
+          float c;
+          Color beerFalloff = Color(1, 1, 1);
+          float insideDist = (closePoint-start).magnitude();
+          bool tir = false; //total internal reflection
           
-          float refractionAngle = asin((1/material.ior) * sin(incidentAngle));
-          Dir3D tDir = ((1/material.ior) * cos(incidentAngle) - cos(refractionAngle)) * normal - (1/material.ior) * (start - closePoint).normalized();
-          Color tColor = rayCast(insidePoint, tDir, vee(insidePoint, tDir).normalized(), recursionDepth+1, false);
-          //Color tColor = rayCast(insidePoint, tDir, vee(closePoint, tDir).normalized(), recursionDepth+1, false);
-          //Color tColor = rayCast(insidePoint, rayDir, rayLine, recursionDepth+1, false);
-          float r = color.r + mTransmissive.r * tColor.r;
-          float g = color.g + mTransmissive.g * tColor.g;
-          float b = color.b + mTransmissive.b * tColor.b;
+          if (dot(rayDir, normal) < 0) { // entering material
+            
+            tDir = refract(rayDir, normal, n, debug); 
+            c = dot(-1*rayDir, normal);
+            //beerFalloff = Color(1, 1, 1);
+          }
+          else { // leaving material
+            //beerFalloff = something
+            tDir = refract(rayDir, -1 * normal, 1/n, debug);
+            if (tDir == NULL) tir = true; // total internal reflection
+            else c = dot(rayDir, normal);
+          }
+          float r0 = (n-1)*(n-1)/(n+1)*(n+1);
+          float schlickR = (tir) ? 1 : r0 + (1 - r0)*pow((1-c), 5);
+
+          Color tColor = Color(0, 0, 0);
+          if (!tir) tColor = rayCast(insidePoint, *tDir, vee(insidePoint, *tDir).normalized(), recursionDepth+1, material.ior, debug);
+          float r = color.r + beerFalloff.r * (schlickR * mTransmissive.r * rColor.r + (1 - schlickR) * mTransmissive.r * tColor.r);
+          float g = color.g + beerFalloff.g * (schlickR * mTransmissive.g * rColor.g + (1 - schlickR) * mTransmissive.g * tColor.g);
+          float b = color.b + beerFalloff.b * (schlickR * mTransmissive.b * rColor.b + (1 - schlickR) * mTransmissive.b * tColor.b);
           color = Color(r, g, b);
+
+          // if (debug) {
+          //   printf("incident: %f, refracted: %f, ior: %f\n", incidentAngle, refractionAngle, material.ior);
+          // }
+          // Dir3D tDir = ((1/material.ior) * cos(incidentAngle) - cos(refractionAngle)) * normal - (1/material.ior) * (start - closePoint).normalized();
+          // tDir = tDir.normalized();
+          // rayDir = rayDir.normalized();
+          // if (debug) {
+          //   printf("incident ray: %f, %f, %f; refracted ray: %f, %f, %f\n\n", rayDir.x, rayDir.y, rayDir.z, tDir.x, tDir.y, tDir.z);
+          // }
+          // Color tColor = rayCast(insidePoint, tDir, vee(insidePoint, tDir).normalized(), recursionDepth+1, closeIndex, debug);
+          // //Color tColor = rayCast(insidePoint, tDir, vee(closePoint, tDir).normalized(), recursionDepth+1, false);
+          // //Color tColor = rayCast(insidePoint, rayDir, rayLine, recursionDepth+1, false);
+          // float r = color.r + mTransmissive.r * tColor.r;
+          // float g = color.g + mTransmissive.g * tColor.g;
+          // float b = color.b + mTransmissive.b * tColor.b;
+          // color = Color(r, g, b);
         }
 
         // Calculate reflection
         if ((mSpecular.r > 0 || mSpecular.g > 0 || mSpecular.b > 0) && recursionDepth < max_depth) {
           Dir3D reflectionDir = rayDir + dot(rayDir, normal)*normal*-2;
-          Color rColor = rayCast(closePoint, reflectionDir, vee(closePoint, reflectionDir).normalized(), recursionDepth+1, false);
+          Color rColor = rayCast(closePoint, reflectionDir, vee(closePoint, reflectionDir).normalized(), recursionDepth+1, startIor, false);
+          float r = color.r + mSpecular.r * rColor.r;
+          float g = color.g + mSpecular.g * rColor.g;
+          float b = color.b + mSpecular.b * rColor.b;
+          color = Color(r, g, b);
         }
 
       }
       else {
         color = background;
+      }
+
+      if (debug) {
+        color = Color(1, 1, 1);
       }
 
       return color;
@@ -208,6 +276,7 @@ int main(int argc, char** argv){
   auto t_start = std::chrono::high_resolution_clock::now();
 
   // Loop through each pixel
+  #pragma omp parallel for num_threads(5)
   for (int i = 0; i < img_width; i++){
     for (int j = 0; j < img_height; j++){
       //TODO: In what way does this assumes the basis is orthonormal?
@@ -217,7 +286,7 @@ int main(int argc, char** argv){
       Dir3D rayDir = (p - eye); 
       Line3D rayLine = vee(eye,rayDir).normalized();  //Normalizing here is optional
 
-      Color color = rayCast(eye, rayDir, rayLine, 0, false);
+      Color color = rayCast(eye, rayDir, rayLine, 0, 1, (i == -1 && j == -1) ? true : false); // set i and j to pick pixel to debug
       
       outputImg.setPixel(i,j, color);
       //outputImg.setPixel(i,j, Color(fabs(i/imgW),fabs(j/imgH),fabs(0))); //TODO: Try this, what is it visualizing?
