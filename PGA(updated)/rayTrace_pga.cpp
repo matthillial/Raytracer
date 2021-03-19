@@ -117,6 +117,32 @@ vector<float> rayPlaneIntersectBary(Point3D rayStart, Line3D rayLine, Point3D v1
   return {INF, 0, 0, 0};
 }
 
+// check to see if any object is blocking
+bool blocked(Point3D closePoint, Line3D lightLine, float lightDist) {
+  // spheres
+  for (int sphereI = 0; sphereI < spheres.size(); sphereI++) {
+    Sphere currentSphere = spheres[sphereI];
+    if (raySphereIntersect(closePoint, lightLine, currentSphere.pos, currentSphere.r) < lightDist) {
+      return true;
+    }
+  }
+  // triangles
+  for (int triangleI = 0; triangleI < triangles.size(); triangleI++) {
+    Triangle currentTriangle = triangles[triangleI];
+    if (rayPlaneIntersect(closePoint, lightLine, currentTriangle.v1, currentTriangle.v2, currentTriangle.v3) < lightDist) {
+      return true;
+    }
+  }
+  // normal triangles
+  for (int nTriangleI = 0; nTriangleI < normaltriangles.size(); nTriangleI++) {
+    NormalTriangle currentNTriangle = normaltriangles[nTriangleI];
+    if (rayPlaneIntersect(closePoint, lightLine, currentNTriangle.v1, currentNTriangle.v2, currentNTriangle.v3) < lightDist) {
+      return true;
+    }
+  }
+  return false;
+}
+
 Dir3D* refract(Dir3D in, Dir3D normal, float n, bool debug) {
   in = in.normalized();
   normal = normal.normalized();
@@ -144,20 +170,8 @@ Color light(Material material, Point3D closePoint, Dir3D normal, Point3D start, 
     if (debug) printf("lightDir: %f %f %f\n", lightDir.x, lightDir.y, lightDir.z);
     Line3D lightLine = vee(closePoint, lightDir).normalized();
 
-    // Check all spheres to see if light is blocked
-    bool blocked = false;
-    for (int sphereI = 0; sphereI < spheres.size(); sphereI++)
-    {
-      Sphere currentSphere = spheres[sphereI];
-      if (raySphereIntersect(closePoint, lightLine, currentSphere.pos, currentSphere.r) < INF)
-      {
-        blocked = true;
-        break;
-      }
-    }
-
     // Add light into composite color if it isn't blocked
-    if (!blocked)
+    if (!blocked(closePoint, lightLine, INF))
     {
       Dir3D viewDir = (start - closePoint).normalized();
       Dir3D halfway = (lightDir + viewDir).normalized();
@@ -178,22 +192,11 @@ Color light(Material material, Point3D closePoint, Dir3D normal, Point3D start, 
     PointLight currentLight = pointLights[lightI];
     Color lightColor = currentLight.color;
     Dir3D lightDir = (currentLight.pos - closePoint).normalized();
+    float lightDist = (currentLight.pos - closePoint).magnitude();
     Line3D lightLine = vee(closePoint, lightDir).normalized();
 
-    // Check all spheres to see if light is blocked
-    bool blocked = false;
-    for (int sphereI = 0; sphereI < spheres.size(); sphereI++)
-    {
-      Sphere currentSphere = spheres[sphereI];
-      if (raySphereIntersect(closePoint, lightLine, currentSphere.pos, currentSphere.r) < INF)
-      {
-        blocked = true;
-        break;
-      }
-    }
-
     // Add light to composite color if light isn't blocked
-    if (!blocked)
+    if (!blocked(closePoint, lightLine, lightDist))
     {
       Dir3D viewDir = (start - closePoint).normalized();
       Dir3D halfway = (lightDir + viewDir).normalized();
@@ -216,23 +219,14 @@ Color light(Material material, Point3D closePoint, Dir3D normal, Point3D start, 
     SpotLight currentLight = spotLights[lightI];
     Color lightColor = currentLight.color;
     Dir3D lightDir = (currentLight.pos - closePoint).normalized();
+    float lightDist = (currentLight.pos - closePoint).magnitude();
     Line3D lightLine = vee(closePoint, lightDir).normalized();
 
     //printf("lightDirx: %f   lightDiry: %f   lightDirz: %f \n", currentLight.dir.x, currentLight.dir.y, currentLight.dir.z);
     //printf("lightDirToHitx: %f   lightDirToHity: %f   lightDirToHitz: %f \n", lightDir.x, lightDir.y, lightDir.z);
 
-    // Check all spheres to see if light is blocked
-    bool blocked = false;
-    for (int sphereI = 0; sphereI < spheres.size(); sphereI++) {
-      Sphere currentSphere = spheres[sphereI];
-      if (raySphereIntersect(closePoint, lightLine, currentSphere.pos, currentSphere.r) < INF) {
-        blocked = true;
-        break;
-      }
-    }
-
     // Add light to composite color if light isn't blocked
-    if (!blocked) {
+    if (!blocked(closePoint, lightLine, lightDist)) {
       Dir3D viewDir = (start - closePoint).normalized();
       Dir3D halfway = (lightDir + viewDir).normalized();
       float falloff = pow(closePoint.distTo(currentLight.pos), 2);
