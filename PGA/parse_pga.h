@@ -100,8 +100,18 @@ class PointLight {
   Color color;
 };
 
+class SpotLight {
+  public:
+  Point3D pos;
+  Color color;
+  Dir3D dir;
+  float angle1;
+  float angle2;
+};
+
 vector<DirLight> directionalLights;
 vector<PointLight> pointLights;
+vector<SpotLight> spotLights;
 Color ambient = Color(0, 0, 0);
 
 //Material Parameters
@@ -265,6 +275,23 @@ void parseSceneFile(std::string fileName){
       ss >> z;
       directionalLights.push_back(DirLight{Point3D(x, y, z), Color(r, g, b)});
     }
+    
+    else if (word == "spot_light:") {
+      float px, py, pz, r, g, b, dx, dy, dz, a1, a2;
+      ss >> r;
+      ss >> g;
+      ss >> b;
+      ss >> px;
+      ss >> py;
+      ss >> pz;
+      ss >> dx;
+      ss >> dy;
+      ss >> dz;
+      ss >> a1;
+      ss >> a2;
+      spotLights.push_back(SpotLight{Point3D(px, py, pz), Color(r, g, b), Dir3D(dx, dy, dz), a1, a2});
+    }
+    
   else if (word == "max_depth:") {
     int d;
     ss >> d;

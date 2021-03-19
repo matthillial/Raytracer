@@ -108,7 +108,7 @@ Color rayCast(Point3D start, Dir3D rayDir, Line3D rayLine, int recursionDepth, b
 	  float closeDNormalTriangle = INF;	// Distance to nearest triangle
       int closeNormalTriangleIndex = -1;  // Index of nearest triangle
       for(int x = 0; x < normaltriangles.size(); x++) {
-		 float d = rayPlaneIntersect(start, rayLine, vertex[normaltriangles[x].v1], vertex[normaltriangles[x].v2], vertex[normaldtriangles[x].v3]);
+		 float d = rayPlaneIntersect(start, rayLine, vertex[normaltriangles[x].v1], vertex[normaltriangles[x].v2], vertex[normaltriangles[x].v3]);
 		 if (d < closeDTriangle) {
 		   closeDNormalTriangle = d;
 		   closeNormalTriangleIndex = x;
@@ -212,6 +212,61 @@ Color rayCast(Point3D start, Dir3D rayDir, Line3D rayLine, int recursionDepth, b
             color = Color(r, g, b);
           }
         }
+        
+        
+        // Check spot lights
+        for(int lightI = 0; lightI < spotLights.size(); lightI++) {
+          SpotLight currentLight = spotLights[lightI];
+          Color lightColor = currentLight.color;
+          Dir3D lightDir = (currentLight.pos - closePoint).normalized();
+          Line3D lightLine = vee(closePoint, lightDir).normalized();
+          
+		  //printf("lightDirx: %f   lightDiry: %f   lightDirz: %f \n", currentLight.dir.x, currentLight.dir.y, currentLight.dir.z);
+		  //printf("lightDirToHitx: %f   lightDirToHity: %f   lightDirToHitz: %f \n", lightDir.x, lightDir.y, lightDir.z);
+
+          // Check all spheres to see if light is blocked
+          bool blocked = false;
+          for(int sphereI = 0; sphereI < spheres.size(); sphereI ++) {
+            Sphere currentSphere = spheres[sphereI];
+            if (raySphereIntersect(closePoint, lightLine, currentSphere.pos, currentSphere.r) < INF) {
+              blocked = true;
+              break;
+            }
+          }
+          
+          // Add light to composite color if light isn't blocked
+          if (!blocked) {
+            Dir3D viewDir = (start - closePoint).normalized();
+            Dir3D halfway = (lightDir + viewDir).normalized();
+            float falloff = pow(closePoint.distTo(currentLight.pos),2);
+            
+            //determine falloff for light intensity using angles given
+            float angle = acos(dot(currentLight.dir,(lightDir*-1))/(currentLight.dir.magnitude() * lightDir.magnitude())) * (180/M_PI);
+            //printf("angle: %f   angle1: %f    angle2: %f \n\n", angle, currentLight.angle1, currentLight.angle2);
+            if (angle < currentLight.angle1) {								//angles less than angle1 should behave like point light
+			   falloff = 1/pow(closePoint.distTo(currentLight.pos),2);
+			   //printf("yeet");
+			   
+			}
+			else if (angle > currentLight.angle2) {							//angles greating than angle2 should contribute nothing;
+				falloff = 1/INF;
+				//printf("yeet");
+			}
+			else {
+			   falloff =  1/pow(closePoint.distTo(currentLight.pos),2) * (1 - ((angle - currentLight.angle1)/(currentLight.angle2-currentLight.angle1)));
+			}
+      
+            //cosine falloffs
+            float difdot = (0 < dot(lightDir,normal)) ? dot(normal,lightDir) : 0;
+            float specdot = (0 < pow(dot(halfway,normal),material.ns)) ? pow(dot(halfway,normal),material.ns) : 0;
+      
+            //point light r g b values
+            float r = color.r + (mDiffuse.r * (lightColor.r * falloff) * difdot) + (mSpecular.r * (lightColor.r * falloff) * specdot);
+            float g = color.g + (mDiffuse.g * (lightColor.g * falloff) * difdot) + (mSpecular.g * (lightColor.g * falloff) * specdot);
+            float b = color.b + (mDiffuse.b * (lightColor.b * falloff) * difdot) + (mSpecular.b * (lightColor.b * falloff) * specdot);
+            color = Color(r, g, b);
+          }
+        }
 
         float incidentAngle = acos(dot(vee(closePoint,(start-closePoint)).normalized(), vee(closePoint, normal).normalized()));
 
@@ -233,6 +288,10 @@ Color rayCast(Point3D start, Dir3D rayDir, Line3D rayLine, int recursionDepth, b
         if ((mSpecular.r > 0 || mSpecular.g > 0 || mSpecular.b > 0) && recursionDepth < max_depth) {
           Dir3D reflectionDir = rayDir + dot(rayDir, normal)*normal*-2;
           Color rColor = rayCast(closePoint, reflectionDir, vee(closePoint, reflectionDir).normalized(), recursionDepth+1, false);
+          float r = color.r + rColor.r;
+          float g = color.g + rColor.g;
+          float b = color.b + rColor.b;
+          color = Color(r,g,b);
         }
 
       }
@@ -277,6 +336,7 @@ int main(int argc, char** argv){
   auto t_start = std::chrono::high_resolution_clock::now();
 
   // Loop through each pixel
+  #pragma omp parallel for
   for (int i = 0; i < img_width; i++){
     for (int j = 0; j < img_height; j++){
       //TODO: In what way does this assumes the basis is orthonormal?
