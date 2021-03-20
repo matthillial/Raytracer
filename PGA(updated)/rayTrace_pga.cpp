@@ -105,18 +105,8 @@ vector<float> rayPlaneIntersectBary(Point3D rayStart, Line3D rayLine, Point3D v1
   b2 = areaTriangle(hitPoint, v3, v1) / area;
   b3 = areaTriangle(hitPoint, v1, v2) / area;
   float d = (hitPoint - rayStart).magnitude();
-  //float d0 = rayPlaneIntersect(rayStart, rayLine, v1, v2, v3);
-  //if (Point3D(b1*v1 + b2*v2 + b3*v3) != hitPoint)
-  // if (d0 != INF) {
-  //   printf("MISMATCHED INTERSECTION: bary: %f, %f\t regular: %f\n", d, b1+b2+b3, d0);
-  //   printf("\tv1: %f, %f, %f; v2: %f, %f, %f; v3: %f, %f, %f; hit: %f, %f, %f\n", v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, v3.x, v3.y, v3.z, hitPoint.x, hitPoint.y, hitPoint.z);
-  // }
-  if ((b1 >= 0 && b1 <= 1) && (b2 >= 0 && b2 <= 1) && (b2 >= 0 && b2 <= 1) && (b1 + b2 + b3 - 1 < 0.0001) && (b1 + b2 + b3 - 1 > -0.0001) && dot(rayLine.dir(), hitPoint-rayStart) > 0) { //point in triangle
-    
+  if ((b1 >= 0 && b1 <= 1) && (b2 >= 0 && b2 <= 1) && (b2 >= 0 && b2 <= 1) && (b1 + b2 + b3 - 1 < 0.001) && (b1 + b2 + b3 - 1 > -0.001) && dot(rayLine.dir(), hitPoint-rayStart) > 0) { //point in triangle
     return {d, b1, b2, b3};
-    //vector<float> ret = {d, b1, b2, b3};
-    //return ret;
-    //return std::pair<float, vector<float>>
   } 
   return {INF, 0, 0, 0};
 }

@@ -330,7 +330,8 @@ void parseSceneFile(std::string fileName){
     ss >> a;
     ss >> b;
     ss >> c;
-    normals.push_back(Dir3D(a,b,c));
+    
+    normals.push_back(Dir3D(a,b,c).normalized());
   }
   
   else if (word == "triangle:") {
