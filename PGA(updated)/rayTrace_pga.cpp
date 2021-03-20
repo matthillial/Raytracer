@@ -74,14 +74,14 @@ bool sameSide(Point3D p1, Point3D p2, Point3D a, Point3D b) {
 float rayPlaneIntersect(Point3D rayStart, Line3D rayLine, Point3D v1, Point3D v2, Point3D v3){
   Plane3D triPlane = vee(v1, v2, v3);	//make plane
   Point3D hitPoint = Point3D(wedge(rayLine,triPlane));
-  // if ((dot(vee(v1,v2,hitPoint),triPlane) >= 0) && (dot(vee(v2,v3,hitPoint),triPlane) >= 0) && (dot(vee(v3,v1,hitPoint), triPlane) >= 0)) {
-  //   float d = (hitPoint - rayStart).magnitude();
-  //   return d;
-  // }
-  if (sameSide(hitPoint, v1, v2, v3) && sameSide(hitPoint, v2, v1, v3) && sameSide(hitPoint, v3, v1, v2) && dot(rayLine.dir(), hitPoint-rayStart) > 0) {
+  if ((dot(vee(v1,v2,hitPoint),triPlane) >= 0) && (dot(vee(v2,v3,hitPoint),triPlane) >= 0) && (dot(vee(v3,v1,hitPoint), triPlane) >= 0) && dot(rayLine.dir(), hitPoint-rayStart) > 0) {
     float d = (hitPoint - rayStart).magnitude();
     return d;
   }
+  // if (sameSide(hitPoint, v1, v2, v3) && sameSide(hitPoint, v2, v1, v3) && sameSide(hitPoint, v3, v1, v2) && dot(rayLine.dir(), hitPoint-rayStart) > 0) {
+  //   float d = (hitPoint - rayStart).magnitude();
+  //   return d;
+  // }
   return INF;
 }
 
@@ -89,13 +89,17 @@ float areaTriangle(Point3D p1, Point3D p2, Point3D p3) {
   return 0.5 * vee(p1, p2, p3).magnitude();
 }
 
-vector<float> rayPlaneIntersectBary(Point3D rayStart, Line3D rayLine, Point3D v1, Point3D v2, Point3D v3) {
+vector<float> rayPlaneIntersectBary(Point3D rayStart, Line3D rayLine, Point3D v1, Point3D v2, Point3D v3, bool debug) {
   v1 = v1.normalized();
+  if (debug) printf("v1: %f %f %f\n", v1.x, v1.y, v1.z);
   v2 = v2.normalized();
+  if (debug) printf("v2: %f %f %f\n", v2.x, v2.y, v2.z);
   v3 = v3.normalized();
+  if (debug) printf("v3: %f %f %f\n", v3.x, v3.y, v3.z);
   Plane3D triPlane = vee(v1, v2, v3);
   float area = 0.5 * triPlane.magnitude();
   Point3D hitPoint = Point3D(wedge(rayLine, triPlane));
+  if (debug) printf("hit: %f %f %f\n", hitPoint.x, hitPoint.y, hitPoint.z);
   float b1, b2, b3;
   b1 = areaTriangle(hitPoint, v2, v3) / area;
   b2 = areaTriangle(hitPoint, v3, v1) / area;
@@ -107,7 +111,7 @@ vector<float> rayPlaneIntersectBary(Point3D rayStart, Line3D rayLine, Point3D v1
   //   printf("MISMATCHED INTERSECTION: bary: %f, %f\t regular: %f\n", d, b1+b2+b3, d0);
   //   printf("\tv1: %f, %f, %f; v2: %f, %f, %f; v3: %f, %f, %f; hit: %f, %f, %f\n", v1.x, v1.y, v1.z, v2.x, v2.y, v2.z, v3.x, v3.y, v3.z, hitPoint.x, hitPoint.y, hitPoint.z);
   // }
-  if ((b1 >= 0 && b1 <= 1) && (b2 >= 0 && b2 <= 1) && (b2 >= 0 && b2 <= 1) && (b1 + b2 + b3 - 1 < 0.00001) && (b1 + b2 + b3 - 1 > -0.00001) && dot(rayLine.dir(), hitPoint-rayStart) > 0) { //point in triangle
+  if ((b1 >= 0 && b1 <= 1) && (b2 >= 0 && b2 <= 1) && (b2 >= 0 && b2 <= 1) && (b1 + b2 + b3 - 1 < 0.0001) && (b1 + b2 + b3 - 1 > -0.0001) && dot(rayLine.dir(), hitPoint-rayStart) > 0) { //point in triangle
     
     return {d, b1, b2, b3};
     //vector<float> ret = {d, b1, b2, b3};
@@ -117,7 +121,7 @@ vector<float> rayPlaneIntersectBary(Point3D rayStart, Line3D rayLine, Point3D v1
   return {INF, 0, 0, 0};
 }
 
-// check to see if any object is blocking
+// check to see if any object is blocking a point from a light
 bool blocked(Point3D closePoint, Line3D lightLine, float lightDist) {
   // spheres
   for (int sphereI = 0; sphereI < spheres.size(); sphereI++) {
@@ -129,20 +133,21 @@ bool blocked(Point3D closePoint, Line3D lightLine, float lightDist) {
   // triangles
   for (int triangleI = 0; triangleI < triangles.size(); triangleI++) {
     Triangle currentTriangle = triangles[triangleI];
-    if (rayPlaneIntersect(closePoint, lightLine, currentTriangle.v1, currentTriangle.v2, currentTriangle.v3) < lightDist) {
+    if (rayPlaneIntersect(closePoint, lightLine, vertex[currentTriangle.v1], vertex[currentTriangle.v2], vertex[currentTriangle.v3]) < lightDist) {
       return true;
     }
   }
   // normal triangles
   for (int nTriangleI = 0; nTriangleI < normaltriangles.size(); nTriangleI++) {
     NormalTriangle currentNTriangle = normaltriangles[nTriangleI];
-    if (rayPlaneIntersect(closePoint, lightLine, currentNTriangle.v1, currentNTriangle.v2, currentNTriangle.v3) < lightDist) {
+    if (rayPlaneIntersect(closePoint, lightLine, vertex[currentNTriangle.v1], vertex[currentNTriangle.v2], vertex[currentNTriangle.v3]) < lightDist) {
       return true;
     }
   }
   return false;
 }
 
+// calculate refraction direction
 Dir3D* refract(Dir3D in, Dir3D normal, float n, bool debug) {
   in = in.normalized();
   normal = normal.normalized();
@@ -153,6 +158,7 @@ Dir3D* refract(Dir3D in, Dir3D normal, float n, bool debug) {
   return new Dir3D((( ( ((ndotu > 0) - (ndotu < 0)) * sqrt(root) ) - (ndotu*n) ) * normal) + (n*in));
 }
 
+// calculate non-reflection/refractiona portion of lights at closePoint
 Color light(Material material, Point3D closePoint, Dir3D normal, Point3D start, bool debug) {
   Color mAmbient = material.ambient;
   Color mDiffuse = material.diffuse;
@@ -167,7 +173,7 @@ Color light(Material material, Point3D closePoint, Dir3D normal, Point3D start, 
     DirLight currentLight = directionalLights[lightI];
     Dir3D lightDir = -1 * currentLight.dir;
     lightDir = lightDir.normalized();
-    if (debug) printf("lightDir: %f %f %f\n", lightDir.x, lightDir.y, lightDir.z);
+    //if (debug) printf("lightDir: %f %f %f\n", lightDir.x, lightDir.y, lightDir.z);
     Line3D lightLine = vee(closePoint, lightDir).normalized();
 
     // Add light into composite color if it isn't blocked
@@ -176,7 +182,7 @@ Color light(Material material, Point3D closePoint, Dir3D normal, Point3D start, 
       Dir3D viewDir = (start - closePoint).normalized();
       Dir3D halfway = (lightDir + viewDir).normalized();
       float difdot = (0 < dot(lightDir, normal)) ? dot(normal, lightDir) : 0;
-      if (debug) {printf("difdot: %f, normal: %f %f %f\n",difdot, normal.x, normal.y, normal.z);}
+      //if (debug) {printf("difdot: %f, normal: %f %f %f\n",difdot, normal.x, normal.y, normal.z);}
       float specdot = (0 < pow(dot(halfway, normal), ns)) ? pow(dot(halfway, normal), ns) : 0;
 
       float r = color.r + (currentLight.color.r * mDiffuse.r * difdot);
@@ -280,8 +286,8 @@ Color rayCast(Point3D start, Dir3D rayDir, Line3D rayLine, int recursionDepth, f
   int closeTriangleIndex = -1; // Index of nearest triangle
   for (int x = 0; x < triangles.size(); x++) {
     float d = rayPlaneIntersect(start, rayLine, vertex[triangles[x].v1], vertex[triangles[x].v2], vertex[triangles[x].v3]);
-    // vector<float> intersect = rayPlaneIntersectBary(start, rayLine, vertex[triangles[x].v1], vertex[triangles[x].v2], vertex[triangles[x].v3]);
-    // float d = intersect[0];
+    //vector<float> intersect = rayPlaneIntersectBary(start, rayLine, vertex[triangles[x].v1], vertex[triangles[x].v2], vertex[triangles[x].v3], false);
+    //float d = intersect[0];
     if (d < closeDTriangle) {
       closeDTriangle = d;
       closeTriangleIndex = x;
@@ -293,15 +299,12 @@ Color rayCast(Point3D start, Dir3D rayDir, Line3D rayLine, int recursionDepth, f
   int closeNormalTriangleIndex = -1; // Index of nearest triangle
   float b1, b2, b3;
   for (int x = 0; x < normaltriangles.size(); x++) {
-    float d0 = rayPlaneIntersect(start, rayLine, vertex[normaltriangles[x].v1], vertex[normaltriangles[x].v2], vertex[normaltriangles[x].v3]);
-    vector<float> intersect = rayPlaneIntersectBary(start, rayLine, vertex[normaltriangles[x].v1], vertex[normaltriangles[x].v2], vertex[normaltriangles[x].v3]);
+    vector<float> intersect = rayPlaneIntersectBary(start, rayLine, vertex[normaltriangles[x].v1], vertex[normaltriangles[x].v2], vertex[normaltriangles[x].v3], false);
     float d = intersect[0];
-    // if (d != d0) {
-    //   printf("MISMATCHED INTERSECTION: bary: %f, %f\t regular: %f\n", d, intersect[0]+intersect[1]+intersect[2], d0);
-    // }
-    if (d < closeDTriangle) {
+    if (d < closeDNormalTriangle) {
       closeDNormalTriangle = d;
       closeNormalTriangleIndex = x;
+      if (debug) intersect = rayPlaneIntersectBary(start, rayLine, vertex[normaltriangles[x].v1], vertex[normaltriangles[x].v2], vertex[normaltriangles[x].v3], true);
       b1 = intersect[1];
       b2 = intersect[2];
       b3 = intersect[3];
@@ -312,7 +315,7 @@ Color rayCast(Point3D start, Dir3D rayDir, Line3D rayLine, int recursionDepth, f
   if (closeD < closeDTriangle && closeD < closeDNormalTriangle) dif = 0;
   else if (closeDTriangle < closeD && closeDTriangle < closeDNormalTriangle) dif = 1;
   else if (closeDNormalTriangle < closeD && closeDNormalTriangle < closeDTriangle) dif = 2;
-  if (debug) printf("dif: %f\n", dif);
+  //if (debug) printf("dif: %f\n", dif);
 
   
 
@@ -330,21 +333,22 @@ Color rayCast(Point3D start, Dir3D rayDir, Line3D rayLine, int recursionDepth, f
   //calculate color for a Triangle(non specified normal
   else if (closeTriangleIndex >= 0 && dif == 1) { 
     closePoint = start + (closeDTriangle - 0.001) * rayLine.dir();
-    //printf("point: %f, %f, %f\n", closePoint.x, closePoint.y, closePoint.z);
     insidePoint = start + (closeDTriangle + 0.0001) * rayLine.dir();
     Triangle tri = triangles[closeTriangleIndex];
 	  normal = cross(vertex[tri.v1]-vertex[tri.v2], vertex[tri.v3]-vertex[tri.v2]).normalized();
     if (dot(normal, rayDir) > 0) normal = -1*normal;
-    //printf("normal: %f, %f, %f\n", normal.x, normal.y, normal.z);
     material = materials[tri.matIndex];
-    //if (debug) printf("Material: %d\n", triangles[closeTriangleIndex].matIndex);
 	}
 	//calculate color for a Triangle (specified normal)
 	else if (closeNormalTriangleIndex >= 0 && dif == 2) {
     closePoint = start + (closeDNormalTriangle - 0.001) * rayLine.dir();
     insidePoint = start + (closeDNormalTriangle + 0.0001) * rayLine.dir();
     NormalTriangle tri = normaltriangles[closeNormalTriangleIndex];
+    if (debug) printf("closeNormalTriangleIndex: %d\n", closeNormalTriangleIndex);
     normal = b1 * normals[tri.n1] + b2 * normals[tri.n2] + b3 * normals[tri.n3];
+    if (debug) printf("Vertex normals: %f %f %f, %f %f %f, %f %f %f\n", 
+      normals[tri.n1].x, normals[tri.n1].y, normals[tri.n1].z, normals[tri.n2].x, normals[tri.n2].y, normals[tri.n2].z, normals[tri.n3].x, normals[tri.n3].y, normals[tri.n3].z);
+    if (debug) printf("Normal: %f %f %f\n", normal.x, normal.y, normal.z);
 	  material = materials[tri.matIndex];
 	}
   else return background; // return background color if no hit
@@ -354,8 +358,7 @@ Color rayCast(Point3D start, Dir3D rayDir, Line3D rayLine, int recursionDepth, f
   mSpecular = material.specular;
   mTransmissive = material.transmissive;
 
-  color = light(material, closePoint, normal, start, debug);
-  if (debug) printf("Color: %f, %f, %f\n", color.r, color.g, color.b);
+  color = light(material, closePoint, normal, start, false);
 
     // Calculate transparency
     if ((mTransmissive.r > 0 || mTransmissive.g > 0 || mTransmissive.b > 0) && recursionDepth < max_depth) {
@@ -367,7 +370,6 @@ Color rayCast(Point3D start, Dir3D rayDir, Line3D rayLine, int recursionDepth, f
 
       // refraction
       float n = 1 / material.ior;
-      if (debug) printf("n: %f\n", n);
       Dir3D *tDir;
       float c;
       Color beerFalloff = Color(1, 1, 1);
@@ -405,7 +407,7 @@ Color rayCast(Point3D start, Dir3D rayDir, Line3D rayLine, int recursionDepth, f
       float b = color.b + mSpecular.b * rColor.b;
       color = Color(r, g, b);
     }
-  if (debug) color = Color(0, 0, 0);
+  if (debug) color = Color(1, 1, 1);
   return color;
 }
 
@@ -431,6 +433,7 @@ int main(int argc, char** argv){
   auto t_start = std::chrono::high_resolution_clock::now();
 
   // Loop through each pixel
+  int pixelProgress = 0;
   #pragma omp parallel for num_threads(5)
   for (int i = 0; i < img_width; i++){
     for (int j = 0; j < img_height; j++){
@@ -441,14 +444,17 @@ int main(int argc, char** argv){
       Dir3D rayDir = (p - eye); 
       Line3D rayLine = vee(eye,rayDir).normalized();  //Normalizing here is optional
 
-      Color color = rayCast(eye, rayDir, rayLine, 0, 1, (i==200 && j==440) ? true : false);
+      Color color = rayCast(eye, rayDir, rayLine, 0, 1, false); //((i==200 && j==240) || (i==380 && j==360)) ? true : false); //turn debug on at certain points
       
       outputImg.setPixel(i,j, color);
       //outputImg.setPixel(i,j, Color(fabs(i/imgW),fabs(j/imgH),fabs(0))); //TODO: Try this, what is it visualizing?
+      pixelProgress++;
+      int progress = 100*pixelProgress/(img_width*img_height);
+      printf("\rProgress: %d%%", progress); 
     }
   }
   auto t_end = std::chrono::high_resolution_clock::now();
-  printf("Rendering took %.2f ms\n",std::chrono::duration<double, std::milli>(t_end-t_start).count());
+  printf("\nRendering took %.2f ms\n",std::chrono::duration<double, std::milli>(t_end-t_start).count());
 
   outputImg.write(imgName.c_str());
   return 0;
